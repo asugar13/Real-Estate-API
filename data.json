@@ -1,0 +1,25 @@
+[{
+  "name": "Awesome place",
+  "description": "Nice loft in city centre",
+  "type": "loft",
+  "bedrooms": 2,
+  "additional info": "1 bathroom and parking",
+  "owner": "asugar13"
+  },
+  {
+    "name": "Nice chalet",
+    "description": "Chalet in suburbs",
+    "type": "chalet",
+    "bedrooms": 4,
+    "additional info": "4 bathroom and common area",
+    "owner": "gianluca"
+  },
+  {
+    "name": "Small appartment",
+    "description": "Small appartment in sketchy area",
+    "type": "appartment",
+    "bedrooms": 1,
+    "additional info": "kitchen and common area",
+    "owner": "asugar13"
+  }
+]
