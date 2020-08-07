@@ -1,11 +1,15 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, render_template
 from flask_pymongo import PyMongo
 from bson import json_util
 from bson.objectid import ObjectId
 
+import os;
+
+
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://localhost:27017/realestatedb"
 mongo = PyMongo(app)
+
 
 @app.route("/", methods=['GET','POST'])
 def index():
@@ -14,6 +18,12 @@ def index():
 
     else:
         return "you got me"
+    
+@app.route("/login", methods=["POST", "GET"])
+def login():
+    if request.method == "GET":
+        print(os.getcwd());
+        return render_template("login.html")
     
 @app.route("/houses", methods=["GET"])
 def get_houses(): 
