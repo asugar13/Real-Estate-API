@@ -1,6 +1,10 @@
-from flask import Flask, request
+from flask import Flask, request, Response
+from flask_pymongo import PyMongo
+from bson import json_util
+from bson.objectid import ObjectId
+
 app = Flask(__name__)
-app.config["MONGO_URI"] = "mongodb://localhost:27017/realstatedb"
+app.config["MONGO_URI"] = "mongodb://localhost:27017/realestatedb"
 mongo = PyMongo(app)
 
 @app.route("/", methods=['GET','POST'])
@@ -11,10 +15,19 @@ def index():
     else:
         return "you got me"
     
-@app.route("/house", methods=["POST"])
-def create_house():
+@app.route("/houses", methods=["GET"])
+def get_houses(): 
+    houses = mongo.db.realestates.find()
+    response = json_util.dumps(houses)
+    return Response(response, mimetype='application/json')
     
+    
+@app.route('/<id>/houses', methods=["GET"])
+def get_city_houses(id):
+    houses = mongo.db.realestates.find({"city": id})
+    response = json_util.dumps(houses)
+    return response
     
 
-#if __name__ == '__main__':
- #   app.run(debug=True)
+if __name__ == '__main__':
+   app.run(debug=True)
