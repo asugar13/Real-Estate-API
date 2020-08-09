@@ -38,7 +38,7 @@ def signup():
     check_user = mongo.db.users.find({"username": username})
     if check_user.count() == 0:
             user_id = mongo.db.users.insert({"username": username,
-                            "password": password})  #save user to database
+                            "password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
             new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
             result = {"user": new_user['username'] + " registered"}
             return jsonify({'result' : result})
@@ -113,34 +113,35 @@ def profile_handler():
     if "username" in session:        
         if request.method == "POST": 
             
-            print(request.form)
-            username = None#finish this
-            first_name = None
-            last_name = None
+            user = mongo.db.users.find_one({"username": session["username"]})
+
+            first_name = user["first_name"]
+            birthdate = user["birthdate"]
+            last_name = user["last_name"]
+            
+            fields = []
             for i in request.form:
-                print(i)
-            username = request.form["username"]
-            first_name = request.form["first_name"]
-            last_name = request.form["last_name"]
-            birthdate = request.form["birthdate"]
-            if (request.form["last_name"] and request.form["first_name"] 
-                and request.form["username"] and request.form["birthdate"]):
-                user = mongo.db.users.find_one({"username": username})
+                fields.append(i)
+                                              
+            if "first_name" in fields:
+                first_name = request.form["first_name"]
                 
-                if (user["username"] == session["username"]):
-                    
-                    updating_user = mongo.db.users.find_one_and_update({"username": username},
-                                                                          {"$set":
-                                                                           {"first_name":first_name,
-                                                                            "last_name": last_name,
-                                                                            "birthdate": birthdate}
-                                                                           
-                                                                           }) 
-                    updated_user = mongo.db.users.find_one({"username": username})
-                    response = json_util.dumps(updated_user)
-                    return Response(response, mimetype='application/json')
-                else:
-                    return "The user name is not in your session"
+            if "birthdate" in fields:
+                birthdate = request.form["birthdate"]
+                
+            if "last_name" in fields:
+                last_name = request.form["last_name"]
+                
+            updating_user = mongo.db.users.find_one_and_update({"username": session["username"]},
+                                                               {"$set":
+                                                                {"first_name":first_name,
+                                                                 "last_name": last_name,
+                                                                 "birthdate": birthdate}
+                                                                }) 
+            updated_user = mongo.db.users.find_one({"username": session["username"]})
+            response = json_util.dumps(updated_user)
+            return Response(response, mimetype='application/json')            
+
         elif request.method == "GET":            
             user = mongo.db.users.find_one({"username":session["username"]})
             
