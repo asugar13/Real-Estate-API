@@ -85,10 +85,27 @@ def get_city_houses(id):
             description = request.form["description"]
             place_type = request.form["type"]
             bedrooms = request.form["bedrooms"]
-            additional_info = request.form["additional info"]
+            additional_info = request.form["additional_info"]
+            print(session["username"])
             owner = session["username"]
             city = id
-            return "ge"
+            house = mongo.db.realestates.find({"name": name, "city": city, 
+                                             "owner": owner})
+            if not house.count() ==0:
+                return "house already exists"
+            
+            mongo.db.realestates.insert({"name": name, "description": description,
+                                         "type": place_type, "bedrooms": bedrooms,
+                                         "additional_info": additional_info, 
+                                         "owner": owner, "city":city})
+            new_property = mongo.db.realestates.find({"name": name, "city": city,
+                                                     "owner": owner})
+            
+                                         
+            
+            
+            response = json_util.dumps(new_property)
+            return Response(response, mimetype='application/json')     
     return "You are not logged in or your session is expired"
 
 @app.route("/profile", methods=["POST", "GET"])
