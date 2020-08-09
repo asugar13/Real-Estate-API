@@ -30,7 +30,7 @@ app.pemanent_session_lifetime = timedelta(minutes=5)
     #__indexes__ = [IndexModel('username', unique=True), 'password']
         
 @app.route("/signup", methods=["POST"])
-def signup():
+def signup_handler():
     username = request.form["username"] 
     password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
     #make sure user does not exist
@@ -45,14 +45,8 @@ def signup():
     return "username already exists!"
            
     
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    #return redirect(url_for(''))
-    return "logged out"
-    
 @app.route("/", methods=["POST", "GET"])
-def login():
+def root_handler():
     if request.method == "GET":
         return render_template("login.html")
     elif request.method == "POST": 
@@ -69,9 +63,62 @@ def login():
             #return redirect(url_for("profile")) #redirect    
         else:
             return "user does not exist"
+#On GET, returns a list with all your houses
+@app.route("/myhouses", methods=["GET", "POST"])
+def my_houses_handler():
+    if "username" in session:
+        if request.method == "GET":
+            my_properties = mongo.db.realestates.find({"owner": session["username"]})
+            response = json_util.dumps(my_properties)
+            return Response(response, mimetype='application/json')
+        elif request.method == "POST":
+            fields = []
+            for i in request.form:
+                fields.append(i)            
+            if "city" and "name" in fields:
+                city = request.form["city"]
+                name = request.form["name"]
+                place = mongo.db.realestates.find_one({"city": city, "name":name})
+                if not place:
+                    return "Given place name not found in given city for your profile"
+                
+                print(place)
+                description = place["description"]
+                place_type = place["type"]
+                bedrooms = place["bedrooms"]
+                additional_info = place["additional_info"]
+                
+                if "description" in fields:
+                    description = request.form["description"]
+                if "type" in fields:
+                    place_type = request.form["type"]
+                if "bedrooms" in fields:
+                    bedrooms = request.form["bedrooms"]
+                if "additional_info" in fields:
+                    additional_info = request.form["additional_info"]
+                
+                updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
+                                                                                   {"$set":
+                                                                                    {"description":description,
+                                                                                     "type": place_type,
+                                                                                     "bedrooms": bedrooms,
+                                                                                     "additional_info": additional_info}
+                                                                                    })
+                
+                updated_place = mongo.db.realestates.find({"name": name, "city": city,
+                                                           "owner": session["username"]})
+                response = json_util.dumps(updated_place)
+                return Response(response, mimetype='application/json')                                         
+            else:
+                return "You need to specify a city and a name form keys"
+    else:
+        return "You are not logged in or your session is expired"
     
-@app.route('/<id>/houses', methods=["GET", "POST"])  #TODO: IMPLEMENT POST FOR USERS TO ADD HOUSE
-def get_city_houses(id):
+    
+#On GET, returns a list with all house objects in given city.
+#On POST, a user can create a new house
+@app.route('/<id>/houses', methods=["GET", "POST"])  
+def city_houses_handler(id):
     if "username" in session:
         if request.method == "GET":
             houses = mongo.db.realestates.find({"city": id})
@@ -80,32 +127,45 @@ def get_city_houses(id):
   
             response = json_util.dumps(houses)
             return Response(response, mimetype='application/json')
-        if request.method == "POST":
-            name = request.form["name"]
-            description = request.form["description"]
-            place_type = request.form["type"]
-            bedrooms = request.form["bedrooms"]
-            additional_info = request.form["additional_info"]
-            print(session["username"])
-            owner = session["username"]
-            city = id
-            house = mongo.db.realestates.find({"name": name, "city": city, 
-                                             "owner": owner})
-            if not house.count() ==0:
-                return "house already exists"
-            
-            mongo.db.realestates.insert({"name": name, "description": description,
-                                         "type": place_type, "bedrooms": bedrooms,
-                                         "additional_info": additional_info, 
-                                         "owner": owner, "city":city})
-            new_property = mongo.db.realestates.find({"name": name, "city": city,
-                                                     "owner": owner})
-            
-                                         
-            
-            
-            response = json_util.dumps(new_property)
-            return Response(response, mimetype='application/json')     
+        if request.method == "POST":           
+            fields = []
+            for i in request.form:
+                fields.append(i)
+                
+            if "name" and "bedrooms" in fields:
+                name = request.form["name"]
+                bedrooms = request.form["bedrooms"]                
+                user = mongo.db.realestates.find({"name":name,"city": id,
+                                                  "owner": session["username"]})
+                
+                description = None
+                place_type = None
+                additional_info = None
+                
+                if user.count() == 0:
+                    
+                    if "description" in fields:
+                        description = request.form["description"]
+                        
+                    if "type" in fields:
+                        place_type = request.form["type"]
+                        
+                    if "additional_info" in fields:
+                        additional_info = request.form["additional_info"]
+                        
+                    mongo.db.realestates.insert({"name": name, "description": description,
+                                            "type": place_type, "bedrooms": bedrooms, 
+                                            "additional_info": additional_info,
+                                            "owner": session["username"],
+                                            "city": id})
+                    new_place = mongo.db.realestates.find({"name": name, "city": id,
+                                                                         "owner": session["username"]})
+                    response = json_util.dumps(new_place)
+                    return Response(response, mimetype='application/json')                         
+                else:
+                    return "The same house name from the same owner in the same city exists. Please edit existing house instead"
+            else:
+                return "You need to specify name and bedrooms"  
     return "You are not logged in or your session is expired"
 
 @app.route("/profile", methods=["POST", "GET"])
@@ -149,7 +209,12 @@ def profile_handler():
             return Response(response, mimetype='application/json')            
         
     return "You are not logged in or your session is expired"
-
+    
+@app.route('/logout')
+def logout_handler():
+    session.pop('username', None)
+    #return redirect(url_for(''))
+    return "logged out"
 
 @app.errorhandler(404)
 def not_found(error=None):
