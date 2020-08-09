@@ -87,6 +87,7 @@ def my_houses_handler():
                 place_type = place["type"]
                 bedrooms = place["bedrooms"]
                 additional_info = place["additional_info"]
+                new_name = None
                 
                 if "description" in fields:
                     description = request.form["description"]
@@ -96,8 +97,24 @@ def my_houses_handler():
                     bedrooms = request.form["bedrooms"]
                 if "additional_info" in fields:
                     additional_info = request.form["additional_info"]
+                    
+                if "new_name" in fields:
+                    new_name = request.form["new_name"]
                 
-                updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
+                if new_name:
+                    updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
+                                                                                                       {"$set":
+                                                                                                        {"description":description,
+                                                                                                         "name": new_name,
+                                                                                                         "type": place_type,
+                                                                                                         "bedrooms": bedrooms,
+                                                                                                         "additional_info": additional_info}                    
+                                                                                                        })
+                    updated_place = mongo.db.realestates.find({"name": new_name, "city": city, 
+                                                               "owner": session["username"]})                    
+                    
+                elif not new_name:
+                    updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
                                                                                    {"$set":
                                                                                     {"description":description,
                                                                                      "type": place_type,
@@ -105,7 +122,7 @@ def my_houses_handler():
                                                                                      "additional_info": additional_info}
                                                                                     })
                 
-                updated_place = mongo.db.realestates.find({"name": name, "city": city,
+                    updated_place = mongo.db.realestates.find({"name": name, "city": city,
                                                            "owner": session["username"]})
                 response = json_util.dumps(updated_place)
                 return Response(response, mimetype='application/json')                                         
