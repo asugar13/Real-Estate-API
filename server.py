@@ -2,7 +2,7 @@ from flask import Flask, request, Response, render_template, session, redirect, 
 from flask_pymongo import PyMongo #mongodb implementation for flask
 from bson import json_util
 from bson.objectid import ObjectId
-from datetime import timedelta
+from datetime import datetime, timedelta
 from flask_bcrypt import Bcrypt  #module to encrypt user passwords
 
 #from pymongo import MongoClient, IndexModel
@@ -31,18 +31,25 @@ app.pemanent_session_lifetime = timedelta(minutes=5)
         
 @app.route("/signup", methods=["POST"])
 def signup_handler():
-    username = request.form["username"] 
-    password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
+    fields = []
+    for i in request.form:
+        fields.append(i)    
+    if "username" in fields and "password" in fields:  
+        username = request.form["username"]  #write more code to check fields are there
+        password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
     #make sure user does not exist
     
-    check_user = mongo.db.users.find({"username": username})
-    if check_user.count() == 0:
+        check_user = mongo.db.users.find({"username": username})
+        if check_user.count() == 0:
             user_id = mongo.db.users.insert({"username": username,
                             "password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
             new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
             result = {"user": new_user['username'] + " registered"}
             return jsonify({'result' : result})
-    return "username already exists!"
+        else:
+            return "username already exists!"
+    else:
+        return "You need to specify username and password!"
            
     
 @app.route("/", methods=["POST", "GET"])
@@ -50,6 +57,7 @@ def root_handler():
     if request.method == "GET":
         return render_template("login.html")
     elif request.method == "POST": 
+        
         username = request.form["username"]
         password = request.form["password"]
         user = mongo.db.users.find_one({"username": username})
@@ -75,7 +83,7 @@ def my_houses_handler():
             fields = []
             for i in request.form:
                 fields.append(i)            
-            if "city" and "name" in fields:
+            if "city" in fields and "name" in fields:
                 city = request.form["city"]
                 name = request.form["name"]
                 place = mongo.db.realestates.find_one({"city": city, "name":name})
@@ -94,14 +102,18 @@ def my_houses_handler():
                 if "type" in fields:
                     place_type = request.form["type"]
                 if "bedrooms" in fields:
-                    bedrooms = request.form["bedrooms"]
+                    try:
+                        bedrooms = int(request.form["bedrooms"])
+                    except ValueError:
+                        return "Please enter a valid integer number for bedrooms record!"
                 if "additional_info" in fields:
                     additional_info = request.form["additional_info"]
                     
                 if "new_name" in fields:
                     new_name = request.form["new_name"]
                 
-                if new_name:
+                if new_name: #TODO: FIX THE REDUNDANCY HERE
+                    
                     updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
                                                                                                        {"$set":
                                                                                                         {"description":description,
@@ -149,9 +161,16 @@ def city_houses_handler(id):
             for i in request.form:
                 fields.append(i)
                 
-            if "name" and "bedrooms" in fields:
-                name = request.form["name"]
-                bedrooms = request.form["bedrooms"]                
+            if "name" in fields and "bedrooms" in fields:
+                if len(request.form["name"])>30:
+                    return "House name can't be longer than 30 characters"
+                else:
+                    name = request.form["name"]
+                try:
+                    bedrooms = int(request.form["bedrooms"])
+                except ValueError:
+                    return "Please enter a valid integer number for bedrooms record!"                
+                
                 user = mongo.db.realestates.find({"name":name,"city": id,
                                                   "owner": session["username"]})
                 
@@ -162,7 +181,10 @@ def city_houses_handler(id):
                 if user.count() == 0:
                     
                     if "description" in fields:
-                        description = request.form["description"]
+                        if len(request.form["description"]) > 300:
+                            description = request.form["description"]
+                        else:
+                            "Description must be less than 300 words"
                         
                     if "type" in fields:
                         place_type = request.form["type"]
@@ -205,6 +227,10 @@ def profile_handler():
                 
             if "birthdate" in fields:
                 birthdate = request.form["birthdate"]
+                try: 
+                    date_time_obj = datetime.strptime(birthdate, '%d/%m/%Y')
+                except ValueError:
+                    return "Birthdate must be in DD/MM/YYYY format"
                 
             if "last_name" in fields:
                 last_name = request.form["last_name"]
@@ -215,12 +241,12 @@ def profile_handler():
                                                                  "last_name": last_name,
                                                                  "birthdate": birthdate}
                                                                 }) 
-            updated_user = mongo.db.users.find_one({"username": session["username"]})
+            updated_user = mongo.db.users.find_one({"username": session["username"]}, {"password": False})
             response = json_util.dumps(updated_user)
             return Response(response, mimetype='application/json')            
 
         elif request.method == "GET":            
-            user = mongo.db.users.find_one({"username":session["username"]})
+            user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
             
             response = json_util.dumps(user)
             return Response(response, mimetype='application/json')            
