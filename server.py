@@ -184,7 +184,7 @@ def city_houses_handler(id):
                 if user.count() == 0:
                     
                     if "description" in fields:
-                        if len(request.form["description"]) > 300:
+                        if len(request.form["description"]) < 300:
                             description = request.form["description"]
                         else:
                             "Description must be less than 300 words"
