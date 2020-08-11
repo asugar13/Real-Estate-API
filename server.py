@@ -5,8 +5,6 @@ from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 from flask_bcrypt import Bcrypt  #module to encrypt user passwords
 
-#from pymongo import MongoClient, IndexModel
-#from pymongoext import *
 
 
 app = Flask(__name__)
@@ -15,19 +13,88 @@ mongo = PyMongo(app)
 bcrypt = Bcrypt(app)
 app.config["SECRET_KEY"] = 'sdn86shbmsdACs'
 app.pemanent_session_lifetime = timedelta(minutes=5)
+    
 
-#class User(Model):
-    #@classmethod
-    #def db(cls):
-        #return MongoClient()['realestatedb']
-
-    #__schema__ = DictField(dict(
-        #username=StringField(required=True), 
-        #password=StringField(required=True),
-        ##yob=IntField(minimum=1900, maximum=2019)
-    #))
-
-    #__indexes__ = [IndexModel('username', unique=True), 'password']
+class User:
+    def __init__(self, username, password, first_name=None, last_name=None, birthdate=None):
+        if len(username)>30:
+            raise ValueError("Username can't be over 30 characters")
+        else:
+            self.username = username
+            
+        
+        self.password = password
+        self.first_name= first_name
+        self.last_name = last_name
+        self.birthdate = birthdate
+        if self.birthdate is not None:
+            try:
+                self.birthdate = datetime.strptime(birthdate, '%d/%m/%Y')
+            except ValueError:
+                raise ValueError("Birthdate must be in DD/MM/YYYY format") #should I?
+        
+        
+    def sign_up(self):    
+        check_user = mongo.db.users.find({"username": self.username})
+        if check_user.count() == 0:
+            user_id = mongo.db.users.insert({"username": self.username,
+                                        "password": self.password, "first_name": self.first_name,
+                                        "last_name": self.last_name,
+                                        "birthdate": self.birthdate})  #save user to database
+            new_user = mongo.db.users.find_one({"_id": user_id}, {"password": False}) #make sure user was saved
+            result = {"user": new_user['username'] + " registered"}
+            return jsonify({'result' : result})
+        
+        else:
+            return "username already exists!"     
+        
+    def edit_profile(self):
+        updating_user = mongo.db.users.find_one_and_update({"username": self.username},
+                                                                    {"$set":
+                                                                    {"first_name":self.first_name,
+                                                                    "last_name": self.last_name,
+                                                                    "birthdate": self.birthdate}
+                                                                    })
+        updated_user = mongo.db.users.find_one({"username": self.username}, {"password": False})
+        response = json_util.dumps(updated_user)
+        return Response(response, mimetype='application/json')           
+            
+@app.route("/profile", methods=["POST", "GET"])
+def profile_handler():
+    if "username" in session:        
+        if request.method == "POST": 
+            
+            user = mongo.db.users.find_one({"username": session["username"]})
+            first_name = user["first_name"]
+            birthdate = user["birthdate"]
+            last_name = user["last_name"]              
+                        
+            fields = []
+            for i in request.form:
+                fields.append(i)
+                                              
+            if "first_name" in fields:
+                first_name = request.form["first_name"]
+                
+            if "birthdate" in fields:
+                birthdate = request.form["birthdate"]                    
+                
+            if "last_name" in fields:
+                last_name = request.form["last_name"]
+                
+            the_user = User(session["username"], user["password"], first_name, last_name,
+                            birthdate)
+            return the_user.edit_profile()
+            
+        elif request.method == "GET":            
+            user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
+            
+            response = json_util.dumps(user)
+            return Response(response, mimetype='application/json')            
+        
+    return "You are not logged in or your session is expired"
+        
+        
         
 @app.route("/signup", methods=["POST"])
 def signup_handler():
@@ -35,24 +102,41 @@ def signup_handler():
     for i in request.form:
         fields.append(i)    
     if "username" in fields and "password" in fields:  
-        if len(request.form["username"]) < 30 and len(request.form["password"])<30:
-            username = request.form["username"]  #write more code to check fields are there
-            password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
-    #make sure user does not exist
-    
-            check_user = mongo.db.users.find({"username": username})
-            if check_user.count() == 0:
-                user_id = mongo.db.users.insert({"username": username,
-                                "password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
-                new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
-                result = {"user": new_user['username'] + " registered"}
-                return jsonify({'result' : result})
-            else:
-                return "username already exists!"
-        else:
-            return "Both username and password need to be less than 30 characters"
+        username = request.form["username"]  #write more code to check fields are there
+        password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
+#make sure user does not exist
+
+        user = User(username, password)
+        return user.sign_up()            
     else:
         return "You need to specify username and password!"
+
+    
+         
+#@app.route("/signup", methods=["POST"])
+#def signup_handler():
+    #fields = []
+    #for i in request.form:
+        #fields.append(i)    
+    #if "username" in fields and "password" in fields:  
+        #if len(request.form["username"]) < 30 and len(request.form["password"])<30:
+            #username = request.form["username"]  #write more code to check fields are there
+            #password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
+    ##make sure user does not exist
+    
+            #check_user = mongo.db.users.find({"username": username})
+            #if check_user.count() == 0:
+                #user_id = mongo.db.users.insert({"username": username,
+                                #"password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
+                #new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
+                #result = {"user": new_user['username'] + " registered"}
+                #return jsonify({'result' : result})
+            #else:
+                #return "username already exists!"
+        #else:
+            #return "Both username and password need to be less than 30 characters"
+    #else:
+        #return "You need to specify username and password!"
            
     
 @app.route("/", methods=["POST", "GET"])
@@ -74,6 +158,7 @@ def root_handler():
             #return redirect(url_for("profile")) #redirect    
         else:
             return "user does not exist"
+        
 #On GET, returns a list with all your houses
 @app.route("/myhouses", methods=["GET", "POST"])
 def my_houses_handler():
@@ -210,51 +295,51 @@ def city_houses_handler(id):
                 return "You need to specify name and bedrooms"  
     return "You are not logged in or your session is expired"
 
-@app.route("/profile", methods=["POST", "GET"])
-def profile_handler():
-    if "username" in session:        
-        if request.method == "POST": 
+#@app.route("/profile", methods=["POST", "GET"])
+#def profile_handler():
+    #if "username" in session:        
+        #if request.method == "POST": 
             
-            user = mongo.db.users.find_one({"username": session["username"]})
+            #user = mongo.db.users.find_one({"username": session["username"]})
 
-            first_name = user["first_name"]
-            birthdate = user["birthdate"]
-            last_name = user["last_name"]
+            #first_name = user["first_name"]
+            #birthdate = user["birthdate"]
+            #last_name = user["last_name"]
             
-            fields = []
-            for i in request.form:
-                fields.append(i)
+            #fields = []
+            #for i in request.form:
+                #fields.append(i)
                                               
-            if "first_name" in fields:
-                first_name = request.form["first_name"]
+            #if "first_name" in fields:
+                #first_name = request.form["first_name"]
                 
-            if "birthdate" in fields:
-                birthdate = request.form["birthdate"]
-                try: 
-                    date_time_obj = datetime.strptime(birthdate, '%d/%m/%Y')
-                except ValueError:
-                    return "Birthdate must be in DD/MM/YYYY format"
+            #if "birthdate" in fields:
+                #birthdate = request.form["birthdate"]
+                #try: 
+                    #date_time_obj = datetime.strptime(birthdate, '%d/%m/%Y')
+                #except ValueError:
+                    #return "Birthdate must be in DD/MM/YYYY format"
                 
-            if "last_name" in fields:
-                last_name = request.form["last_name"]
+            #if "last_name" in fields:
+                #last_name = request.form["last_name"]
                 
-            updating_user = mongo.db.users.find_one_and_update({"username": session["username"]},
-                                                               {"$set":
-                                                                {"first_name":first_name,
-                                                                 "last_name": last_name,
-                                                                 "birthdate": birthdate}
-                                                                }) 
-            updated_user = mongo.db.users.find_one({"username": session["username"]}, {"password": False})
-            response = json_util.dumps(updated_user)
-            return Response(response, mimetype='application/json')            
+            #updating_user = mongo.db.users.find_one_and_update({"username": session["username"]},
+                                                               #{"$set":
+                                                                #{"first_name":first_name,
+                                                                 #"last_name": last_name,
+                                                                 #"birthdate": birthdate}
+                                                                #}) 
+            #updated_user = mongo.db.users.find_one({"username": session["username"]}, {"password": False})
+            #response = json_util.dumps(updated_user)
+            #return Response(response, mimetype='application/json')            
 
-        elif request.method == "GET":            
-            user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
+        #elif request.method == "GET":            
+            #user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
             
-            response = json_util.dumps(user)
-            return Response(response, mimetype='application/json')            
+            #response = json_util.dumps(user)
+            #return Response(response, mimetype='application/json')            
         
-    return "You are not logged in or your session is expired"
+    #return "You are not logged in or your session is expired"
     
 @app.route('/logout')
 def logout_handler():
@@ -264,10 +349,6 @@ def logout_handler():
 
 @app.errorhandler(404)
 def not_found(error=None):
-    #message = {
-        #"message": "Resource not found: " + request.url
-        #}
-    #return message
     response = jsonify({
         "message": "Resource not found: " + request.url,
         "status": 404
