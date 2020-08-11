@@ -22,7 +22,7 @@ app.pemanent_session_lifetime = timedelta(minutes=5)
         #return MongoClient()['realestatedb']
 
     #__schema__ = DictField(dict(
-        #username=StringField(required=True),
+        #username=StringField(required=True), 
         #password=StringField(required=True),
         ##yob=IntField(minimum=1900, maximum=2019)
     #))
@@ -35,19 +35,22 @@ def signup_handler():
     for i in request.form:
         fields.append(i)    
     if "username" in fields and "password" in fields:  
-        username = request.form["username"]  #write more code to check fields are there
-        password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
+        if len(request.form["username"]) < 30 and len(request.form["password"])<30:
+            username = request.form["username"]  #write more code to check fields are there
+            password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
     #make sure user does not exist
     
-        check_user = mongo.db.users.find({"username": username})
-        if check_user.count() == 0:
-            user_id = mongo.db.users.insert({"username": username,
-                            "password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
-            new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
-            result = {"user": new_user['username'] + " registered"}
-            return jsonify({'result' : result})
+            check_user = mongo.db.users.find({"username": username})
+            if check_user.count() == 0:
+                user_id = mongo.db.users.insert({"username": username,
+                                "password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
+                new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
+                result = {"user": new_user['username'] + " registered"}
+                return jsonify({'result' : result})
+            else:
+                return "username already exists!"
         else:
-            return "username already exists!"
+            return "Both username and password need to be less than 30 characters"
     else:
         return "You need to specify username and password!"
            
@@ -76,7 +79,7 @@ def root_handler():
 def my_houses_handler():
     if "username" in session:
         if request.method == "GET":
-            my_properties = mongo.db.realestates.find({"owner": session["username"]})
+            my_properties = mongo.db.properties.find({"owner": session["username"]})
             response = json_util.dumps(my_properties)
             return Response(response, mimetype='application/json')
         elif request.method == "POST":
@@ -86,7 +89,7 @@ def my_houses_handler():
             if "city" in fields and "name" in fields:
                 city = request.form["city"]
                 name = request.form["name"]
-                place = mongo.db.realestates.find_one({"city": city, "name":name})
+                place = mongo.db.properties.find_one({"city": city, "name":name})
                 if not place:
                     return "Given place name not found in given city for your profile"
                 
@@ -114,7 +117,7 @@ def my_houses_handler():
                 
                 if new_name: #TODO: FIX THE REDUNDANCY HERE
                     
-                    updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
+                    updating_house = mongo.db.properties.find_one_and_update({"owner": session["username"], "city": city, "name": name},
                                                                                                        {"$set":
                                                                                                         {"description":description,
                                                                                                          "name": new_name,
@@ -122,11 +125,11 @@ def my_houses_handler():
                                                                                                          "bedrooms": bedrooms,
                                                                                                          "additional_info": additional_info}                    
                                                                                                         })
-                    updated_place = mongo.db.realestates.find({"name": new_name, "city": city, 
+                    updated_place = mongo.db.properties.find({"name": new_name, "city": city, 
                                                                "owner": session["username"]})                    
                     
                 elif not new_name:
-                    updating_house = mongo.db.realestates.find_one_and_update({"owner": session["username"], "city": city, "name": name},
+                    updating_house = mongo.db.properties.find_one_and_update({"owner": session["username"], "city": city, "name": name},
                                                                                    {"$set":
                                                                                     {"description":description,
                                                                                      "type": place_type,
@@ -134,7 +137,7 @@ def my_houses_handler():
                                                                                      "additional_info": additional_info}
                                                                                     })
                 
-                    updated_place = mongo.db.realestates.find({"name": name, "city": city,
+                    updated_place = mongo.db.properties.find({"name": name, "city": city,
                                                            "owner": session["username"]})
                 response = json_util.dumps(updated_place)
                 return Response(response, mimetype='application/json')                                         
@@ -150,7 +153,7 @@ def my_houses_handler():
 def city_houses_handler(id):
     if "username" in session:
         if request.method == "GET":
-            houses = mongo.db.realestates.find({"city": id})
+            houses = mongo.db.properties.find({"city": id})
             if houses.count() == 0:
                 return "No houses found in location: " + id
   
@@ -171,7 +174,7 @@ def city_houses_handler(id):
                 except ValueError:
                     return "Please enter a valid integer number for bedrooms record!"                
                 
-                user = mongo.db.realestates.find({"name":name,"city": id,
+                user = mongo.db.properties.find({"name":name,"city": id,
                                                   "owner": session["username"]})
                 
                 description = None
@@ -192,12 +195,12 @@ def city_houses_handler(id):
                     if "additional_info" in fields:
                         additional_info = request.form["additional_info"]
                         
-                    mongo.db.realestates.insert({"name": name, "description": description,
+                    mongo.db.properties.insert({"name": name, "description": description,
                                             "type": place_type, "bedrooms": bedrooms, 
                                             "additional_info": additional_info,
                                             "owner": session["username"],
                                             "city": id})
-                    new_place = mongo.db.realestates.find({"name": name, "city": id,
+                    new_place = mongo.db.properties.find({"name": name, "city": id,
                                                                          "owner": session["username"]})
                     response = json_util.dumps(new_place)
                     return Response(response, mimetype='application/json')                         
