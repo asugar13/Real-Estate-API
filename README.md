@@ -53,7 +53,7 @@ Install any missing dependencies using pip. To install mongo please visit: https
      Updates the property fields to the DB with the given form data and returns the updated property object fields.
 
 /&lt;id&gt;/properties:
-  - GET: Returns a JSON array with all the properties in given city id (<id> should be one of: "paris", "lyon", "bruxelles", "marseille", "montreal").
+  - GET: Returns a JSON array with all the properties in given city id (&lt;id&gt; should be one of: "paris", "lyon", "bruxelles", "marseille", "montreal").
   - POST: Required form data is:
     - "name" (property name)  
     - "bedrooms" (valid integer).  
