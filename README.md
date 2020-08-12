@@ -56,7 +56,8 @@ Install any missing dependencies using pip. To install mongo please visit: https
   - POST: Required form data is:
     - "name" (property name)  
     - "bedrooms" (valid integer).  
-    - Optional form data is "description" (description of the property), "type" (one of "loft", "condo", "apartment", "house", "mansion") and "additional_info" (for any additional property information).
+    - Optional form data is "description" (description of the property), "type" (one of "loft", "condo", "apartment", "house", "mansion") and "additional_info" (for any additional property information).   
+    Creates a new property with the given form data and writes it to the DB. Returns the new property object fields.
 
 /logout:
 - GET: Deletes user session and logs it out.
