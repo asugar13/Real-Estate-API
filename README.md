@@ -1,110 +1,62 @@
-Database schemas (enforced when writing to the DB):
-var UserSchema = new Schema(
-  {
-    username:{
-      type: String, required:true, len(username)<30
-    },
-    password: {
-      type: String, required: true, len(password)<30
-    },
-    first_name: {
-      type: String, len(first_name)<30
-    },
-    last_name: {
-      type: String, len(last_name)<30
-    }
-    birthdate: {
-      type: Date
-    }
-  }
-)
+# Instructions
+1-Get the code on your local machine
+```
+$ git clone https://github.com/asugar13/Real-Estate-API.git
+```
+2- Create a clean new database directory inside the repo.
+```
+$ mkdir database
+```
+3- Run mongo on the new directory
+```
+$ mongod --dbpath database
+```
+4-Use python3 to run the server.py file
+```
+$ python3 server.py
+```
 
-primary key: username
-
-var PropertySchema = new Schema(
-  {
-    name: {
-      type: String, required: true, len(name)<30
-    },
-    city: {
-      type: String, required: true
-    },
-    owner: {
-      type: String, required: true
-    },
-    bedrooms: {
-      type: Number, required: true
-    },
-    description: {
-      type: String
-    },
-    additional_info: {
-      type: String
-    },
-    type: {
-      type: String
-    }
-  }
-)
-
-primary group key: owner, name, city
+Install any missing dependencies using pip. To install mongo please visit: https://docs.mongodb.com/manual/installation/
 
 
-Routes:
-/            
-Methods: POST/GET
-GET returns login.html      (learned how to render pages in Flask)
-POST:
-	Form data:
-		username
-		password
-Logs you in and creates a session.
 
+# Routes
 
-/signup
-Methods: POST
-Form data:
-		username
-		password
-Signs you up in the users collection
+/:
+  - GET: Returns API instructions
+  - POST: Required form data is:
+       - "username"  (String less than 30 characters)
+       - "password". (String, minimum 8 characters, at least one letter and one number)
+       Logs you in and creates a session.
 
-/myhouses
-Methods: GET, POST
-GET:
-	Returns a list of properties where you are the owner
-POST:
-	You can edit info about your own properties.
-	Form data:
-		City (required)
-		Name (required)
-		Description
-		Bedrooms
-		Type
-		Additional_info
-		New_name
+/signup:
+  - POST: Required form data is:
+      - "username" (30 characters max)
+      - "password" (8 characters min, at least one letter and one number)
+      Signs you up to the DB and returns a success/error message upon completion.
 
-/<id>/houses
-Methods: GET, POST
-GET:
-	Returns all the properties in city id
-POST: Posts a new property in city id
-	Form data:
-		Name (required)
-		Bedrooms	(required)
-		Description
-		Type
-		Additional_info
+/profile:
+  - GET: Returns user fields (except password) from session.
+  - POST: Optional form data is:
+      - "first_name" (15 characters max)
+      - "last_name" (20 characters max, )
+      - "birthdate" (in DD-MM-YYYY format)
+      Updates the user fields to the DB with the given form data and returns the updated user object (except password field).
 
-/profile
-Methods: GET, POST
-GET: Returns your user info
-POST:
-	You can edit the following user fields.
-		Form data:
-			First_name
-			Last_name
-			Birthdate
+/myproperties:
+  - GET: Returns JSON array with all the properties belonging to the user logged.
+  - POST: Required form data is:
+     - "city"  (one of ["paris", "lyon", "bruxelles", "marseille", "montreal"])
+     - "name" (name of the logged in user's property to edit)
+     - Optional form data is "description", "type" (one of ["loft", "condo", "apartment", "house", "mansion"]), "bedrooms" (valid integer) and "new_name" (if you want to change the property name).
+     Updates the property fields to the DB with the given form data and returns the updated property object fields.
 
-/logout
-Method: GET
-deletes your session.
+/<id>/properties:
+  - GET: Returns a JSON array with all the properties in given city id (<id> should be one of: "paris", "lyon", "bruxelles", "marseille", "montreal".)
+  - POST: Required form data is:
+    - "name" (property name)  
+    - "bedrooms" (valid integer).
+    Optional form data is "description" (description of the property), "type" (one of "loft", "condo", "apartment", "house", "mansion") and "additional_info" (for any additional property information).
+
+/logout:
+- GET: Deletes user session and logs it out.

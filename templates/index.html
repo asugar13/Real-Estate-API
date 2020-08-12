@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Real Estate API</title>
+    <!-- can add an icon if we want later
+    <link rel="shortcut icon" href="%PUBLIC_URL%/<SOME ICON>.ico">
+    -->
+</head>
+<body>
+    <h1 id="title">Welcome To Real Estate API</h1>
+
+
+    # Routes<br><br>
+
+    /: <br>
+      &ensp;- GET: Returns API instructions<br>
+      &ensp;- POST: Required form data is:<br>
+           &emsp;- "username"  (String less than 30 characters)<br>
+          &emsp; - "password". (String, minimum 8 characters, at least one letter and one number)<br>
+          &emsp; Logs you in and creates a session.<br><br>
+
+    /signup:<br>
+    &ensp;  - POST: Required form data is:<br>
+        &emsp;  - "username" (30 characters max)<br>
+        &emsp;  - "password" (8 characters min, at least one letter and one number)<br>
+        &emsp;  Signs you up to the DB and returns a success/error message upon completion.<br><br>
+
+    /profile:<br>
+      &ensp;- GET: Returns user fields (except password) from session.<br>
+    &ensp;  - POST: Optional form data is:<br>
+        &emsp;  - "first_name" (15 characters max)<br>
+        &emsp;  - "last_name" (20 characters max, )<br>
+        &emsp;  - "birthdate" (in DD-MM-YYYY format)<br>
+        &emsp;  Updates the user fields to the DB with the given form data and returns the updated user object (except password field).<br><br>
+
+    /myproperties:<br>
+      &ensp;- GET: Returns JSON array with all the properties belonging to the user logged.<br>
+    &ensp;  - POST: Required form data is:<br>
+      &emsp;   - "city"  (one of ["paris", "lyon", "bruxelles", "marseille", "montreal"])<br>
+      &emsp;   - "name" (name of the logged in user's property to edit)<br>
+    &emsp;     - Optional form data is "description", "type" (one of ["loft", "condo", "apartment", "house", "mansion"]), "bedrooms" (valid integer) and "new_name" (if you want to change the property name).<br>
+      &emsp;   Updates the property fields to the DB with the given form data and returns the updated property object fields.<br><br>
+
+    /&lt;id&gt;	/properties:<br>
+      &ensp;- GET: Returns a JSON array with all the properties in given city id (<id> should be one of: "paris", "lyon", "bruxelles", "marseille", "montreal".)<br>
+      &ensp;- POST: Required form data is:<br>
+      &emsp;  - "name" (property name)<br>
+      &emsp;  - "bedrooms" (valid integer).<br>
+      &emsp;  Optional form data is "description" (description of the property), "type" (one of "loft", "condo", "apartment", "house", "mansion") and "additional_info" (for any additional property information).<br><br>
+
+    /logout:<br>
+    &ensp;- GET: Deletes user session and logs it out.<br>
+</body>
+</html>

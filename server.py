@@ -1,67 +1,60 @@
-from flask import Flask, request, Response, render_template, session, redirect, url_for, jsonify
+from flask import Flask, request, Response, render_template, session, jsonify
 from flask_pymongo import PyMongo #mongodb implementation for flask
 from bson import json_util
 from bson.objectid import ObjectId
-from datetime import datetime, timedelta
-from flask_bcrypt import Bcrypt  #module to encrypt user passwords
-
-
+from datetime import timedelta
+import bcrypt
+from User import User
 
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://localhost:27017/realestatedb"
 mongo = PyMongo(app)
-bcrypt = Bcrypt(app)
 app.config["SECRET_KEY"] = 'sdn86shbmsdACs'
-app.pemanent_session_lifetime = timedelta(minutes=5)
-    
+app.pemanent_session_lifetime = timedelta(minutes=5)      
 
-class User:
-    def __init__(self, username, password, first_name=None, last_name=None, birthdate=None):
-        if len(username)>30:
-            raise ValueError("Username can't be over 30 characters")
+valid_cities = ["paris", "lyon", "bruxelles", "marseille", "montreal"]
+valid_types = ["loft", "condo", "apartment", "house", "mansion"]
+       
+
+#On GET, returns a template with API docs
+#On POST, you can sign in and create a session
+@app.route("/", methods=["POST", "GET"])
+def root_handler():
+    if request.method == "GET":
+        return render_template("index.html")
+    elif request.method == "POST": 
+        
+        username = request.form["username"]
+        password = request.form["password"]
+        user = mongo.db.users.find_one({"username": username})
+        
+        if user:   
+            if bcrypt.checkpw(password.encode('utf-8'), user['password']):
+                #session.permanent = True
+                session["username"] = username
+                return "Logged in successfully"
         else:
-            self.username = username
+            return "username not found in the Database" 
+        
+#On POST, signs you up to the DB
+@app.route("/signup", methods=["POST"])
+def signup_handler():
+    fields = []
+    for i in request.form:
+        fields.append(i)    
+    if "username" in fields and "password" in fields:  
+        username = request.form["username"]  
+        password = request.form["password"]    
+        user = User(username, password)
+        return user.sign_up(mongo) 
+    else:
+        return "You need to specify username and password!"        
             
-        
-        self.password = password
-        self.first_name= first_name
-        self.last_name = last_name
-        self.birthdate = birthdate
-        if self.birthdate is not None:
-            try:
-                self.birthdate = datetime.strptime(birthdate, '%d/%m/%Y')
-            except ValueError:
-                raise ValueError("Birthdate must be in DD/MM/YYYY format") #should I?
-        
-        
-    def sign_up(self):    
-        check_user = mongo.db.users.find({"username": self.username})
-        if check_user.count() == 0:
-            user_id = mongo.db.users.insert({"username": self.username,
-                                        "password": self.password, "first_name": self.first_name,
-                                        "last_name": self.last_name,
-                                        "birthdate": self.birthdate})  #save user to database
-            new_user = mongo.db.users.find_one({"_id": user_id}, {"password": False}) #make sure user was saved
-            result = {"user": new_user['username'] + " registered"}
-            return jsonify({'result' : result})
-        
-        else:
-            return "username already exists!"     
-        
-    def edit_profile(self):
-        updating_user = mongo.db.users.find_one_and_update({"username": self.username},
-                                                                    {"$set":
-                                                                    {"first_name":self.first_name,
-                                                                    "last_name": self.last_name,
-                                                                    "birthdate": self.birthdate}
-                                                                    })
-        updated_user = mongo.db.users.find_one({"username": self.username}, {"password": False})
-        response = json_util.dumps(updated_user)
-        return Response(response, mimetype='application/json')           
-            
+#On GET, it shows you your profile.
+#On POST, you can edit your profile (first name, last name, birthdate)
 @app.route("/profile", methods=["POST", "GET"])
 def profile_handler():
-    if "username" in session:        
+    if "username" in session:
         if request.method == "POST": 
             
             user = mongo.db.users.find_one({"username": session["username"]})
@@ -82,90 +75,32 @@ def profile_handler():
             if "last_name" in fields:
                 last_name = request.form["last_name"]
                 
-            the_user = User(session["username"], user["password"], first_name, last_name,
+            
+            the_user = User(session["username"], None, first_name, last_name,
                             birthdate)
-            return the_user.edit_profile()
+            return the_user.edit_profile(mongo)
             
         elif request.method == "GET":            
-            user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
-            
+            user = mongo.db.users.find_one({"username":session["username"]}, {"password": False, "_id": False})
+            user["birthdate"] = str(user["birthdate"]).split(" ")[0]
             response = json_util.dumps(user)
             return Response(response, mimetype='application/json')            
         
-    return "You are not logged in or your session is expired"
-        
-        
-        
-@app.route("/signup", methods=["POST"])
-def signup_handler():
-    fields = []
-    for i in request.form:
-        fields.append(i)    
-    if "username" in fields and "password" in fields:  
-        username = request.form["username"]  #write more code to check fields are there
-        password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
-#make sure user does not exist
-
-        user = User(username, password)
-        return user.sign_up()            
     else:
-        return "You need to specify username and password!"
-
-    
-         
-#@app.route("/signup", methods=["POST"])
-#def signup_handler():
-    #fields = []
-    #for i in request.form:
-        #fields.append(i)    
-    #if "username" in fields and "password" in fields:  
-        #if len(request.form["username"]) < 30 and len(request.form["password"])<30:
-            #username = request.form["username"]  #write more code to check fields are there
-            #password = bcrypt.generate_password_hash(request.form["password"]).decode('utf-8')     #get user name and pw from form data
-    ##make sure user does not exist
-    
-            #check_user = mongo.db.users.find({"username": username})
-            #if check_user.count() == 0:
-                #user_id = mongo.db.users.insert({"username": username,
-                                #"password": password, "first_name": None, "last_name": None, "birthdate": None})  #save user to database
-                #new_user = mongo.db.users.find_one({"_id": user_id}) #make sure user was saved
-                #result = {"user": new_user['username'] + " registered"}
-                #return jsonify({'result' : result})
-            #else:
-                #return "username already exists!"
-        #else:
-            #return "Both username and password need to be less than 30 characters"
-    #else:
-        #return "You need to specify username and password!"
-           
-    
-@app.route("/", methods=["POST", "GET"])
-def root_handler():
-    if request.method == "GET":
-        return render_template("login.html")
-    elif request.method == "POST": 
+        return "You are not logged in or your session is expired"
         
-        username = request.form["username"]
-        password = request.form["password"]
-        user = mongo.db.users.find_one({"username": username})
         
-        if user:   #if user is in the database so variable is not null
-            
-            if bcrypt.check_password_hash(user['password'], password):
-                session.permanent = True
-                session["username"] = username
-                return "logged in"
-            #return redirect(url_for("profile")) #redirect    
-        else:
-            return "user does not exist"
-        
-#On GET, returns a list with all your houses
-@app.route("/myhouses", methods=["GET", "POST"])
-def my_houses_handler():
+#On GET, returns a list with all your properties
+#On POST, you can edit an existing property
+@app.route("/myproperties", methods=["GET", "POST"])
+def my_properties_handler():
     if "username" in session:
         if request.method == "GET":
-            my_properties = mongo.db.properties.find({"owner": session["username"]})
+            my_properties = mongo.db.properties.find({"owner": session["username"]},{"_id":False})
             response = json_util.dumps(my_properties)
+            if response == '[]':
+                return "You do not own any properties here"
+            
             return Response(response, mimetype='application/json')
         elif request.method == "POST":
             fields = []
@@ -178,7 +113,6 @@ def my_houses_handler():
                 if not place:
                     return "Given place name not found in given city for your profile"
                 
-                print(place)
                 description = place["description"]
                 place_type = place["type"]
                 bedrooms = place["bedrooms"]
@@ -188,7 +122,10 @@ def my_houses_handler():
                 if "description" in fields:
                     description = request.form["description"]
                 if "type" in fields:
-                    place_type = request.form["type"]
+                    if request.form["type"] in valid_types:
+                        place_type = request.form["type"]
+                    else:
+                        return "type needs to be one of: " + str(valid_types) + " but you entered: " + request.form["type"]
                 if "bedrooms" in fields:
                     try:
                         bedrooms = int(request.form["bedrooms"])
@@ -200,8 +137,7 @@ def my_houses_handler():
                 if "new_name" in fields:
                     new_name = request.form["new_name"]
                 
-                if new_name: #TODO: FIX THE REDUNDANCY HERE
-                    
+                if new_name:
                     updating_house = mongo.db.properties.find_one_and_update({"owner": session["username"], "city": city, "name": name},
                                                                                                        {"$set":
                                                                                                         {"description":description,
@@ -211,7 +147,7 @@ def my_houses_handler():
                                                                                                          "additional_info": additional_info}                    
                                                                                                         })
                     updated_place = mongo.db.properties.find({"name": new_name, "city": city, 
-                                                               "owner": session["username"]})                    
+                                                               "owner": session["username"]},{"_id": False})                    
                     
                 elif not new_name:
                     updating_house = mongo.db.properties.find_one_and_update({"owner": session["username"], "city": city, "name": name},
@@ -223,130 +159,98 @@ def my_houses_handler():
                                                                                     })
                 
                     updated_place = mongo.db.properties.find({"name": name, "city": city,
-                                                           "owner": session["username"]})
+                                                           "owner": session["username"]},{"_id": False})
                 response = json_util.dumps(updated_place)
+                
                 return Response(response, mimetype='application/json')                                         
             else:
                 return "You need to specify a city and a name form keys"
     else:
         return "You are not logged in or your session is expired"
     
-    
-#On GET, returns a list with all house objects in given city.
-#On POST, a user can create a new house
-@app.route('/<id>/houses', methods=["GET", "POST"])  
-def city_houses_handler(id):
+#On GET, returns a list with all property objects in given city.
+#On POST, a user can create a new property.
+@app.route('/<id>/properties', methods=["GET", "POST"])  
+def city_properties_handler(id):
     if "username" in session:
-        if request.method == "GET":
-            houses = mongo.db.properties.find({"city": id})
-            if houses.count() == 0:
-                return "No houses found in location: " + id
+        entered = id
+        id = id.lower()
+        if id in valid_cities:        
+            if request.method == "GET":
+                houses = mongo.db.properties.find({"city": id}, {"_id": False})
+                if houses.count() == 0:
+                    return "No properties  found in location: " + id
   
-            response = json_util.dumps(houses)
-            return Response(response, mimetype='application/json')
-        if request.method == "POST":           
-            fields = []
-            for i in request.form:
-                fields.append(i)
-                
-            if "name" in fields and "bedrooms" in fields:
-                if len(request.form["name"])>30:
-                    return "House name can't be longer than 30 characters"
-                else:
-                    name = request.form["name"]
-                try:
-                    bedrooms = int(request.form["bedrooms"])
-                except ValueError:
-                    return "Please enter a valid integer number for bedrooms record!"                
-                
-                user = mongo.db.properties.find({"name":name,"city": id,
-                                                  "owner": session["username"]})
-                
-                description = None
-                place_type = None
-                additional_info = None
-                
-                if user.count() == 0:
+                response = json_util.dumps(houses)
+                return Response(response, mimetype='application/json')
+            
+            if request.method == "POST":           
+                fields = []
+                for i in request.form:
+                    fields.append(i)
                     
-                    if "description" in fields:
-                        if len(request.form["description"]) < 300:
-                            description = request.form["description"]
-                        else:
-                            "Description must be less than 300 words"
+                if "name" in fields and "bedrooms" in fields:
+                    if len(request.form["name"])>30:
+                        return "Property name can't be longer than 30 characters"
+                    else:
+                        name = request.form["name"]
+                    try:
+                        bedrooms = int(request.form["bedrooms"])
+                    except ValueError:
+                        return "Please enter a valid integer number for bedrooms record!"                
+                    
+                    user = mongo.db.properties.find({"name":name,"city": id,
+                                                      "owner": session["username"]})
+                    
+                    description = None
+                    place_type = None
+                    additional_info = None
+                    
+                    if user.count() == 0:
                         
-                    if "type" in fields:
-                        place_type = request.form["type"]
-                        
-                    if "additional_info" in fields:
-                        additional_info = request.form["additional_info"]
-                        
-                    mongo.db.properties.insert({"name": name, "description": description,
-                                            "type": place_type, "bedrooms": bedrooms, 
-                                            "additional_info": additional_info,
-                                            "owner": session["username"],
-                                            "city": id})
-                    new_place = mongo.db.properties.find({"name": name, "city": id,
-                                                                         "owner": session["username"]})
-                    response = json_util.dumps(new_place)
-                    return Response(response, mimetype='application/json')                         
+                        if "description" in fields:
+                            if len(request.form["description"]) < 300:
+                                description = request.form["description"]
+                            else:
+                                "Description must be less than 300 words"
+                            
+                        if "type" in fields:
+                            if request.form["type"] in valid_types:
+                                place_type = request.form["type"]
+                            else:
+                                return "type needs to be one of: " + str(valid_types) + " but you entered: " + request.form["type"]                            
+                                 
+                        if "additional_info" in fields:
+                            additional_info = request.form["additional_info"]
+                            
+                        mongo.db.properties.insert({"name": name, "description": description,
+                                                "type": place_type, "bedrooms": bedrooms, 
+                                                "additional_info": additional_info,
+                                                "owner": session["username"],
+                                                "city": id})
+                        new_place = mongo.db.properties.find({"name": name, "city": id,
+                                                                             "owner": session["username"]}, {"_id":False})
+                        response = json_util.dumps(new_place)
+                        return Response(response, mimetype='application/json')                         
+                    else:
+                        return "The same house name from the same owner in the same city (" + id + ") exists. Please edit existing house instead"
                 else:
-                    return "The same house name from the same owner in the same city exists. Please edit existing house instead"
-            else:
-                return "You need to specify name and bedrooms"  
-    return "You are not logged in or your session is expired"
+                    return "You need to specify name and bedrooms"
+        else:
+            return "Valid cities are: " + str(valid_cities) + " but you entered " + entered            
+    else:
+        return "You are not logged in or your session is expired"
 
-#@app.route("/profile", methods=["POST", "GET"])
-#def profile_handler():
-    #if "username" in session:        
-        #if request.method == "POST": 
-            
-            #user = mongo.db.users.find_one({"username": session["username"]})
 
-            #first_name = user["first_name"]
-            #birthdate = user["birthdate"]
-            #last_name = user["last_name"]
-            
-            #fields = []
-            #for i in request.form:
-                #fields.append(i)
-                                              
-            #if "first_name" in fields:
-                #first_name = request.form["first_name"]
-                
-            #if "birthdate" in fields:
-                #birthdate = request.form["birthdate"]
-                #try: 
-                    #date_time_obj = datetime.strptime(birthdate, '%d/%m/%Y')
-                #except ValueError:
-                    #return "Birthdate must be in DD/MM/YYYY format"
-                
-            #if "last_name" in fields:
-                #last_name = request.form["last_name"]
-                
-            #updating_user = mongo.db.users.find_one_and_update({"username": session["username"]},
-                                                               #{"$set":
-                                                                #{"first_name":first_name,
-                                                                 #"last_name": last_name,
-                                                                 #"birthdate": birthdate}
-                                                                #}) 
-            #updated_user = mongo.db.users.find_one({"username": session["username"]}, {"password": False})
-            #response = json_util.dumps(updated_user)
-            #return Response(response, mimetype='application/json')            
-
-        #elif request.method == "GET":            
-            #user = mongo.db.users.find_one({"username":session["username"]}, {"password": False})
-            
-            #response = json_util.dumps(user)
-            #return Response(response, mimetype='application/json')            
-        
-    #return "You are not logged in or your session is expired"
-    
+#On GET, deletes your session
 @app.route('/logout')
 def logout_handler():
     session.pop('username', None)
     #return redirect(url_for(''))
-    return "logged out"
+    return "Logged out"
 
+
+#404 status code customer handler
 @app.errorhandler(404)
 def not_found(error=None):
     response = jsonify({
@@ -355,8 +259,6 @@ def not_found(error=None):
         })
     response.status_code = 404
     return response
-        
-
 
 if __name__ == '__main__':
-   app.run(debug=True)
+    app.run(debug=True)
