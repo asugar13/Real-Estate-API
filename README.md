@@ -11,7 +11,7 @@ $ mkdir database
 ```
 $ mongod --dbpath database
 ```
-4-Use python3 to run the server.py file
+4-Use python3 to run the server.py file on a new terminal window.
 ```
 $ python3 server.py
 ```
