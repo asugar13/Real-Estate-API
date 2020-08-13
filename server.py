@@ -14,7 +14,6 @@ app.pemanent_session_lifetime = timedelta(minutes=5)
 
 valid_cities = ["paris", "lyon", "bruxelles", "marseille", "montreal"]
 valid_types = ["loft", "condo", "apartment", "house", "mansion"]
-       
 
 #On GET, returns a template with API docs
 #On POST, you can sign in and create a session
